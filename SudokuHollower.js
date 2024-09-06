@@ -31,13 +31,14 @@ function ShuffleArray(arr, rng) {
  * 通用数独生成函数
  * @param {number} nr 子单元行数
  * @param {number} nc 子单元列数
+ * @param {string|undefined} toStringType 附加至输出列表的格式化函数
  * @return 按种子生成掏空前后数独的函数
  */
-function GenGenSudoku(nr, nc) {
+function GenGenSudoku(nr, nc, toStringType) {
     const x = nr * nc
     const total = x * x
 
-    function GenSudoku(seed, harder) {
+    function GenSudoku(seed, harder, keepPredicate) {
         let rng = GetSeededRandom(seed)
         /**@type {number[][]}*/
         let pool = Array(x)
@@ -113,6 +114,13 @@ function GenGenSudoku(nr, nc) {
             checker.delete(null)
             return checker.size == 8
         }
+        fillSeq.length = 0
+        for (let i = 0; i < total; i++) {
+            let r = i % x,
+                c = Math.floor(i / x)
+            if (keepPredicate && keepPredicate(r, c)) continue
+            fillSeq.push([r, c])
+        }
         ShuffleArray(fillSeq, rng)
         for (let pair of fillSeq) {
             let [r, c] = pair
@@ -181,6 +189,29 @@ function GenGenSudoku(nr, nc) {
         }
 
         return [pool, hollowed, hollowedHarder]
+    }
+
+    if (toStringType) {
+        let addSep = (lst, step, sep) => {
+            let res = []
+            for (let i = 0; i < x; i++) {
+                res.push(lst[i])
+                if (i % step == step - 1 && i < x - 1) res.push(sep)
+            }
+            return res
+        }
+
+        let sudokuToString = null
+        if (toStringType == 'hex')
+            sudokuToString = function () {
+                let tmp = this.map(line => {
+                    let tline = line.map(x => `[${!x ? ' ' : x < 10 ? String(x) : String.fromCharCode(55 + x)}]`)
+                    return addSep(tline, nc, '|').join('')
+                })
+                return addSep(tmp, nr, '-'.repeat(tmp[0].length)).join('\n')
+            }
+        if (sudokuToString)
+            return (seed, harder, keepPredicate) => GenSudoku(seed, harder, keepPredicate).map(x => ((x.toString = sudokuToString), x))
     }
 
     return GenSudoku
