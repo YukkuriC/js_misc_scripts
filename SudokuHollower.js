@@ -25,6 +25,7 @@ function ShuffleArray(arr, rng) {
         let pick = Math.floor(rng() * (1 + i))
         if (pick != i) [arr[i], arr[pick]] = [arr[pick], arr[i]]
     }
+    return arr
 }
 
 /**
@@ -46,21 +47,28 @@ function GenGenSudoku(nr, nc, toStringType) {
             .map(() => [])
 
         // 1. gen fill seq
-        let fillSeq = []
-        for (let i = 0; i < total; i++) {
-            fillSeq.push([i % x, Math.floor(i / x)])
+        let getInitSeq = () => {
+            let ret = []
+            let offset = Math.floor(total * rng())
+            for (let i = 0; i < total; i++) {
+                let j = (i + offset) % total
+                ret.push([j % x, Math.floor(j / x)])
+            }
+            return ret
         }
-        // ShuffleArray(fillSeq, rng)
-        // 随机填充位置必爆，改固定位置随机数字顺序
-        let fillChoices = Array(x)
-            .fill(0)
-            .map((_, i) => i + 1)
-        ShuffleArray(fillChoices, rng)
+        let getInitChoices = () =>
+            ShuffleArray(
+                Array(x)
+                    .fill(0)
+                    .map((_, i) => i + 1),
+                rng,
+            )
+        let fillChoices, fillSeq // init later
 
         // 2. backtracking
         let counter = 0,
             success = false
-        let early_terminate = 1e6
+        let early_terminate = 514 * x
         function validAt(r, c) {
             let self = pool[r][c]
             for (let i = 0; i < x; i++) {
@@ -81,6 +89,13 @@ function GenGenSudoku(nr, nc, toStringType) {
             return true
         }
         function fillAt(idx) {
+            // init
+            if (idx === 0) {
+                for (let row of pool) row.length = 0
+                fillSeq = getInitSeq()
+                fillChoices = getInitChoices()
+                counter = 0
+            }
             counter++
             if (counter >= early_terminate) throw 'stop'
             if (rng() < 0.5) ShuffleArray(fillChoices, rng)
@@ -96,16 +111,10 @@ function GenGenSudoku(nr, nc, toStringType) {
         }
         for (let t = 0; t < 10; t++) {
             try {
-                counter = 0
                 fillAt(0)
                 success = true
                 break
-            } catch (e) {
-                // reset array
-                fillChoices = Array(9)
-                    .fill(0)
-                    .map((_, i) => i + 1)
-            }
+            } catch (e) {}
         }
         // fallback
         if (!success) {
